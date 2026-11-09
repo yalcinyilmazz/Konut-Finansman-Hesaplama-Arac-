@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Konut Finansmanı Hesaplama Aracı</title>
+
+<style>
+body{
+    font-family:Arial,Helvetica,sans-serif;
+    background:#f4f6f9;
+    margin:20px;
+}
+
+.container{
+    max-width:1400px;
+    margin:auto;
+}
+
+h1{
+    text-align:center;
+    color:#1f2937;
+}
+
+.form-box{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+    margin-bottom:20px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:15px;
+}
+
+label{
+    display:block;
+    margin-bottom:5px;
+    font-weight:bold;
+}
+
+input,select{
+    width:100%;
+    padding:10px;
+    border:1px solid #ccc;
+    border-radius:5px;
+}
+
+button{
+    margin-top:20px;
+    background:#0f62fe;
+    color:white;
+    border:none;
+    padding:12px 25px;
+    border-radius:6px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#0043ce;
+}
+
+.cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:15px;
+    margin-bottom:20px;
+}
+
+.card{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+
+.card-title{
+    font-size:14px;
+    color:#666;
+}
+
+.card-value{
+    margin-top:10px;
+    font-size:22px;
+    font-weight:bold;
+    color:#0f172a;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    background:white;
+}
+
+th{
+    background:#0f172a;
+    color:white;
+    padding:10px;
+}
+
+td{
+    border:1px solid #ddd;
+    padding:8px;
+    text-align:center;
+}
+
+.hakedis{
+    background:#5f9f72 !important;
+    color:white;
+    font-weight:bold;
+}
+
+.summary{
+    margin-top:20px;
+    padding:15px;
+    background:white;
+    border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>Konut Finansmanı Hesaplama Aracı</h1>
+
+<div class="form-box">
+
+<div class="grid">
+
+<div>
+<label>Konut Tutarı</label>
+<input type="number" id="konut">
+</div>
+
+<div>
+<label>Peşinat</label>
+<input type="number" id="pesinat">
+</div>
+
+<div>
+<label>Aylık Taksit</label>
+<input type="number" id="taksit">
+</div>
+
+<div>
+<label>Artış Oranı (%)</label>
+<input type="number" id="artis" value="0">
+</div>
+
+<div>
+<label>Artış Periyodu</label>
+<select id="periyot">
+<option value="6">6 Aylık</option>
+<option value="12">Yıllık</option>
+</select>
+</div>
+
+</div>
+
+<button onclick="hesapla()">Planı Oluştur</button>
+
+</div>
+
+<div class="cards">
+
+<div class="card">
+<div class="card-title">Organizasyon Ücreti</div>
+<div class="card-value" id="orgKart">0 ₺</div>
+</div>
+
+<div class="card">
+<div class="card-title">Toplam Geri Ödeme</div>
+<div class="card-value" id="toplamKart">0 ₺</div>
+</div>
+
+<div class="card">
+<div class="card-title">İlk Taksit Tarihi</div>
+<div class="card-value" id="ilkKart">-</div>
+</div>
+
+<div class="card">
+<div class="card-title">Müşteri Teslim Tarihi</div>
+<div class="card-value" id="teslimKart">-</div>
+</div>
+
+</div>
+
+<div id="tablo"></div>
+
+</div>
+
+<script>
+
+function formatTutar(x){
+return Number(x).toLocaleString('tr-TR',{
+minimumFractionDigits:2,
+maximumFractionDigits:2
+}) + " ₺";
+}
+
+function formatDate(d){
+return d.toLocaleDateString('tr-TR');
+}
+
+function hesapla(){
+
+let konut = Number(document.getElementById("konut").value);
+let pesinat = Number(document.getElementById("pesinat").value);
+let taksit = Number(document.getElementById("taksit").value);
+let artis = Number(document.getElementById("artis").value);
+let periyot = Number(document.getElementById("periyot").value);
+
+if(konut<=0 || taksit<=0){
+alert("Lütfen gerekli alanları doldurun.");
+return;
+}
+
+let org = konut * 0.07;
+let toplamGeriOdeme = konut + org;
+
+document.getElementById("orgKart").innerHTML = formatTutar(org);
+document.getElementById("toplamKart").innerHTML = formatTutar(toplamGeriOdeme);
+
+let kalanAnapara = konut - pesinat;
+let hedefHakedis = konut * 0.45;
+
+let bugun = new Date();
+
+let toplamTaksitOdemesi = 0;
+let toplamOdenen = pesinat;
+let odenenAnaPara = pesinat;
+
+let ay = 1;
+
+let satirlar = "";
+
+let aktifTaksit = taksit;
+
+let teslimAyi = null;
+let teslimTarihi = null;
+
+while(odenenAnaPara < konut){
+
+if(ay>1 && ((ay-1)%periyot===0)){
+aktifTaksit = aktifTaksit * (1 + artis/100);
+}
+
+let tarih = new Date(
+bugun.getFullYear(),
+bugun.getMonth()+ay-1,
+bugun.getDate()
+);
+
+let orgEk = 0;
+
+if(ay===1){
+orgEk = org/2;
+}
+else if(ay<=5){
+orgEk = (org/2)/4;
+}
+
+let odeme = Math.min(aktifTaksit, konut - odenenAnaPara);
+
+odenenAnaPara += odeme;
+toplamTaksitOdemesi += odeme;
+toplamOdenen = pesinat + toplamTaksitOdemesi;
+
+if(
+teslimAyi===null &&
+(pesinat + toplamTaksitOdemesi)>=hedefHakedis
+){
+teslimAyi = Math.max(ay,6);
+
+let t = new Date(
+bugun.getFullYear(),
+bugun.getMonth()+teslimAyi-1,
+bugun.getDate()
+);
+
+teslimTarihi = t;
+}
+
+let rowClass = "";
+let mesaj = "";
+
+if(teslimAyi!==null && ay===teslimAyi){
+rowClass="hakedis";
+mesaj="MÜŞTERİ KONUTU TESLİM ALABİLİR";
+}
+
+satirlar += `
+<tr class="${rowClass}">
+<td>${ay}</td>
+<td>${formatDate(tarih)}</td>
+<td>${formatTutar(odeme)}</td>
+<td>${formatTutar(orgEk)}</td>
+<td>${formatTutar(toplamOdenen)}</td>
+<td>${formatTutar(odenenAnaPara)}</td>
+<td>${mesaj}</td>
+</tr>
+`;
+
+ay++;
+
+if(ay>1000) break;
+}
+
+document.getElementById("ilkKart").innerHTML =
+formatDate(new Date());
+
+document.getElementById("teslimKart").innerHTML =
+teslimTarihi ? formatDate(teslimTarihi) : "-";
+
+document.getElementById("tablo").innerHTML=`
+
+<div class="summary">
+<b>Konut Tutarı:</b> ${formatTutar(konut)}
+&nbsp;&nbsp;&nbsp;
+<b>Peşinat:</b> ${formatTutar(pesinat)}
+&nbsp;&nbsp;&nbsp;
+<b>Hakediş Eşiği (%45):</b> ${formatTutar(hedefHakedis)}
+</div>
+
+<br>
+
+<table>
+
+<thead>
+<tr>
+<th>Ay</th>
+<th>Vade Tarihi</th>
+<th>Taksit</th>
+<th>Organizasyon Payı</th>
+<th>Toplam Ödenen</th>
+<th>Kümülatif Ana Para</th>
+<th>Durum</th>
+</tr>
+</thead>
+
+<tbody>
+${satirlar}
+</tbody>
+
+</table>
+`;
+}
+</script>
+
+</body>
+</html>
